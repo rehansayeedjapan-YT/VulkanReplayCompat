@@ -12,7 +12,7 @@
     "MixinVideoRenderer",
     "MixinSaveableFramebuffer",
     "MixinCustomImGuiImplGl3",
-    "MixinMinecraftClientRender",
+    "MixinGameRenderer",
     "MixinGL11GlGetIntegerv",
     "MixinReplayUI",
     "MixinInGameHud"
