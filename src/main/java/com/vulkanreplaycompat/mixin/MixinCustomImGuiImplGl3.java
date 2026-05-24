@@ -255,10 +255,11 @@ public class MixinCustomImGuiImplGl3 {
                         int   a = vtxBuffer.get(base + 19) & 0xFF;
 
                         if (i == 0 && System.currentTimeMillis() % 1000 < 50) {
-                            System.out.println("[VulkanReplayCompat] Vertex 0: vtxOff=" + vtxOffset + " idxOff=" + idxOffset + " idx=" + index + " base=" + base + " limit=" + vtxBuffer.limit() + " x=" + x + " y=" + y);
+                            System.out.println("[VulkanReplayCompat] Vertex 0: base=" + base + " x=" + x + " y=" + y + " r=" + r + " g=" + g + " b=" + b + " a=" + a);
                         }
 
-                        bufferBuilder.vertex(x, y, 0).texture(u, v).color(r, g, b, a);
+                        // Order MUST match format: POSITION -> TEXTURE -> COLOR
+                        bufferBuilder.vertex(x, y, 0).texture(u, v).color(r, g, b, 255);
                         anyVertices = true;
                     }
 
