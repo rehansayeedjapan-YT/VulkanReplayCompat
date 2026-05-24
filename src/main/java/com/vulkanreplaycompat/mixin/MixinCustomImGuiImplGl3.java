@@ -175,6 +175,11 @@ public class MixinCustomImGuiImplGl3 {
         try {
             RenderSystem.getModelViewStack().pushMatrix();
             RenderSystem.getModelViewStack().identity();
+            
+            try {
+                Class<?> vrsClass = Class.forName("net.vulkanmod.vulkan.VRenderSystem");
+                vrsClass.getMethod("setShaderColor", float.class, float.class, float.class, float.class).invoke(null, 1.0f, 1.0f, 1.0f, 1.0f);
+            } catch (Exception e) {}
 
             for (int n = 0; n < drawData.getCmdListsCount(); n++) {
                 ByteBuffer rawVtx = drawData.getCmdListVtxBufferData(n);
