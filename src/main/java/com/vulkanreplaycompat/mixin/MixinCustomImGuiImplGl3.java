@@ -209,7 +209,6 @@ public class MixinCustomImGuiImplGl3 {
                     //         (int) (clipMaxX - clipMinX),
                     //         (int) (clipMaxY - clipMinY)
                     // );
-
                     int elemCount = drawData.getCmdListCmdBufferElemCount(n, cmdIdx);
                     int idxOffset = drawData.getCmdListCmdBufferIdxOffset(n, cmdIdx);
                     int vtxOffset = drawData.getCmdListCmdBufferVtxOffset(n, cmdIdx);
@@ -227,9 +226,15 @@ public class MixinCustomImGuiImplGl3 {
                                 Class<?> gpuTexViewCls = Class.forName("com.mojang.blaze3d.textures.GpuTextureView");
                                 vrsClass.getMethod("setShaderTexture", int.class, gpuTexViewCls)
                                         .invoke(null, 0, tex.getGlTextureView());
+                            } else {
+                                if (cmdIdx == 0 && System.currentTimeMillis() % 1000 < 50) {
+                                    System.err.println("[VulkanReplayCompat] FONT TEXTURE IS NULL! UI WILL BE INVISIBLE!");
+                                }
                             }
                         } catch (Exception e) {
-                            // ignore – texture binding failure just means invisible text
+                            if (cmdIdx == 0 && System.currentTimeMillis() % 1000 < 50) {
+                                System.err.println("[VulkanReplayCompat] FONT TEXTURE BIND ERROR: " + e);
+                            }
                         }
                     }
 
