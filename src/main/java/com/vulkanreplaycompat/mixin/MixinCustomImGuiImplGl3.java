@@ -351,8 +351,23 @@ public class MixinCustomImGuiImplGl3 {
                                 
                                 try {
                                     Class<?> vtsClass = Class.forName("net.vulkanmod.vulkan.texture.VTextureSelector");
-                                    vtsClass.getMethod("bindShaderTextures", Class.forName("net.vulkanmod.vulkan.shader.Pipeline")).invoke(null, vkPipeline);
                                     
+                                    // Manually bind font texture to slot 0
+                                    net.minecraft.client.texture.AbstractTexture tex = 
+                                        net.minecraft.client.MinecraftClient.getInstance().getTextureManager().getTexture(fontTextureId);
+                                    if (tex != null) {
+                                        tex.bindTexture(); // Force upload if not uploaded yet!
+                                        Class<?> vkGlTextureClass = Class.forName("net.vulkanmod.gl.VkGlTexture");
+                                        Object vkGlTex = vkGlTextureClass.getMethod("getTexture", int.class).invoke(null, tex.getGlId());
+                                        if (vkGlTex != null) {
+                                            Object vulkanImage = vkGlTex.getClass().getMethod("getVulkanImage").invoke(vkGlTex);
+                                            if (vulkanImage != null) {
+                                                Class<?> vulkanImageClass = Class.forName("net.vulkanmod.vulkan.texture.VulkanImage");
+                                                vtsClass.getMethod("bindTexture", int.class, vulkanImageClass).invoke(null, 0, vulkanImage);
+                                            }
+                                        }
+                                    }
+
                                     Class<?> rendererClass = Class.forName("net.vulkanmod.vulkan.Renderer");
                                     Object commandBuffer = rendererClass.getMethod("getCommandBuffer").invoke(null);
                                     int currentFrame = (int) rendererClass.getMethod("getCurrentFrame").invoke(null);
