@@ -149,7 +149,7 @@ public class MixinCustomImGuiImplGl3 {
         Method uploadUBOs     = null;
         Method pushConstants  = null;
         try {
-            Object mcPipeline = Class.forName("net.vulkanmod.render.shader.CustomRenderPipelines").getField("GUI_TRIANGLES").get(null);
+            Object mcPipeline = net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED;
             Class<?> extClass = Class.forName("net.vulkanmod.interfaces.shader.ExtendedRenderPipeline");
             if (extClass.isInstance(mcPipeline)) {
                 vkPipeline   = extClass.getMethod("getPipeline").invoke(mcPipeline);
@@ -250,7 +250,7 @@ public class MixinCustomImGuiImplGl3 {
                             }
                         } catch (Exception e) {}
                     }
-                    BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR_TEXTURE);
+                    BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE_COLOR);
                     boolean anyVertices = false;
 
                     for (int i = 0; i < elemCount; i++) {
@@ -286,8 +286,8 @@ public class MixinCustomImGuiImplGl3 {
                             } catch (Exception e) {}
                         }
 
-                        // Order MUST match format: POSITION -> COLOR -> TEXTURE
-                        bufferBuilder.vertex(x, y, 0).color(r, g, b, a).texture(u, v);
+                        // Order MUST match format: POSITION -> TEXTURE -> COLOR
+                        bufferBuilder.vertex(x, y, 0).texture(u, v).color(r, g, b, a);
                         anyVertices = true;
                     }
 
@@ -335,7 +335,7 @@ public class MixinCustomImGuiImplGl3 {
                             drawerDraw.invoke(drawerInst,
                                     vertexData,
                                     VertexFormat.DrawMode.TRIANGLES,
-                                    VertexFormats.POSITION_COLOR_TEXTURE,
+                                    VertexFormats.POSITION_TEXTURE_COLOR,
                                     elemCount);
                         }
                     } catch (Exception e) {
