@@ -186,6 +186,14 @@ public class MixinCustomImGuiImplGl3 {
                 vrsClass.getMethod("applyMVP", org.joml.Matrix4f.class, org.joml.Matrix4f.class).invoke(null, modelView, projection);
             } catch (Exception e) {}
 
+            try {
+                Class<?> rendererClass = Class.forName("net.vulkanmod.vulkan.Renderer");
+                Object rendererInst2 = rendererClass.getMethod("getInstance").invoke(null);
+                rendererClass.getMethod("beginFrame").invoke(rendererInst2);
+            } catch (Exception e) {
+                System.err.println("[VulkanReplayCompat] Failed to beginFrame: " + e.getMessage());
+            }
+
             for (int n = 0; n < drawData.getCmdListsCount(); n++) {
                 ByteBuffer rawVtx = drawData.getCmdListVtxBufferData(n);
                 ByteBuffer vtxBuffer = ByteBuffer.allocateDirect(rawVtx.limit()).order(ByteOrder.nativeOrder());
