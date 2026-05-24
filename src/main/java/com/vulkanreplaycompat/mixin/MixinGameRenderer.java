@@ -9,8 +9,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinGameRenderer {
 
     // method_31904 is render(FJZ)V (float tickDelta, long startTime, boolean tick)
-    @Inject(method = "method_31904", at = @At("RETURN"), remap = false)
-    private void afterGameRender(float tickDelta, long startTime, boolean tick, CallbackInfo ci) {
+    @Inject(method = "render", at = @At("RETURN"))
+    private void afterGameRender(net.minecraft.client.render.RenderTickCounter tickCounter, boolean tick, CallbackInfo ci) {
         if (!com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread()) {
             return;
         }

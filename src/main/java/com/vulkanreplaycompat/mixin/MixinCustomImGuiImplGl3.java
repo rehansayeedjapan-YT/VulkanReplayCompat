@@ -205,8 +205,8 @@ public class MixinCustomImGuiImplGl3 {
 
             for (int n = 0; n < drawData.getCmdListsCount(); n++) {
                 ByteBuffer rawVtx = drawData.getCmdListVtxBufferData(n);
-                ByteBuffer vtxBuffer = ByteBuffer.allocateDirect(rawVtx.limit()).order(ByteOrder.nativeOrder());
                 rawVtx.rewind();
+                ByteBuffer vtxBuffer = ByteBuffer.allocateDirect(rawVtx.remaining()).order(ByteOrder.nativeOrder());
                 vtxBuffer.put(rawVtx);
                 vtxBuffer.flip();
                 
