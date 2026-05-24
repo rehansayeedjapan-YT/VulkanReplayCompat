@@ -241,6 +241,7 @@ public class MixinCustomImGuiImplGl3 {
             for (int n = 0; n < drawData.getCmdListsCount(); n++) {
                 ByteBuffer rawVtx = drawData.getCmdListVtxBufferData(n);
                 rawVtx.rewind();
+                rawVtx.rewind();
                 ByteBuffer vtxBuffer = ByteBuffer.allocateDirect(rawVtx.remaining()).order(ByteOrder.nativeOrder());
                 vtxBuffer.put(rawVtx);
                 vtxBuffer.flip();
@@ -314,16 +315,7 @@ public class MixinCustomImGuiImplGl3 {
                         int b = (color >> 16) & 0xFF;
                         int a = (color >> 24) & 0xFF;
 
-                        if (i == 0 && System.currentTimeMillis() % 1000 < 50) {
-                            try {
-                                System.out.println("[VulkanReplayCompat] DUMPING VertexFormats:");
-                                for (java.lang.reflect.Field f : VertexFormats.class.getDeclaredFields()) {
-                                    if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) && f.getType() == VertexFormat.class) {
-                                        System.out.println("Format Field: " + f.getName());
-                                    }
-                                }
-                            } catch (Exception e) {}
-                        }
+                        // Log removed
 
                         // Order MUST match format: POSITION -> TEXTURE -> COLOR
                         bufferBuilder.vertex(x, y, 400.0f).texture(u, v).color(r, g, b, a);
@@ -394,9 +386,8 @@ public class MixinCustomImGuiImplGl3 {
                                         org.joml.Matrix4f myView = new org.joml.Matrix4f().translation(0.0f, 0.0f, -2000.0f);
                                         
                                         Class<?> vrsClassM = Class.forName("net.vulkanmod.vulkan.VRenderSystem");
-                                        vrsClassM.getMethod("applyModelViewMatrix", org.joml.Matrix4f.class).invoke(null, myView);
-                                        vrsClassM.getMethod("applyProjectionMatrix", org.joml.Matrix4f.class).invoke(null, myProj);
-                                        vrsClassM.getMethod("calculateMVP").invoke(null);
+                                        vrsClassM.getMethod("applyMVP", org.joml.Matrix4f.class, org.joml.Matrix4f.class)
+                                                 .invoke(null, myView, myProj);
                                         
                                         java.lang.reflect.Method getBuffersM = vkPipeline.getClass().getMethod("getBuffers");
                                         java.util.List<?> uboList = (java.util.List<?>) getBuffersM.invoke(vkPipeline);
