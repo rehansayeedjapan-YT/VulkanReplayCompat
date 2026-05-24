@@ -266,7 +266,7 @@ public class MixinCustomImGuiImplGl3 {
                     //         (int) (clipMaxX - clipMinX),
                     //         (int) (clipMaxY - clipMinY)
                     // );
-                    RenderSystem.disableScissor();
+                    // RenderSystem.disableScissor();
 
                     int elemCount = drawData.getCmdListCmdBufferElemCount(n, cmdIdx);
                     int idxOffset = drawData.getCmdListCmdBufferIdxOffset(n, cmdIdx);
