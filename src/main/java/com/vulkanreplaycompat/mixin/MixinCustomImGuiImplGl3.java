@@ -161,9 +161,14 @@ public class MixinCustomImGuiImplGl3 {
         try {
             Object mcPipeline = net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED;
             Class<?> extClass = Class.forName("net.vulkanmod.interfaces.shader.ExtendedRenderPipeline");
+            
+            System.out.println("[VulkanReplayCompat] mcPipeline=" + mcPipeline);
+            System.out.println("[VulkanReplayCompat] extClass.isInstance=" + extClass.isInstance(mcPipeline));
+
             if (extClass.isInstance(mcPipeline)) {
                 // Try to get pipeline
                 vkPipeline = extClass.getMethod("getPipeline").invoke(mcPipeline);
+                System.out.println("[VulkanReplayCompat] Initial vkPipeline=" + vkPipeline);
                 
                 // If null, it hasn't been compiled yet. Force compile it!
                 if (vkPipeline == null) {
