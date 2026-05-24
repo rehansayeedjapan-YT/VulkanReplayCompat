@@ -228,7 +228,8 @@ public class MixinCustomImGuiImplGl3 {
                     int vtxOffset = drawData.getCmdListCmdBufferVtxOffset(n, cmdIdx);
 
                     // Bind the font texture for this draw call
-                    Object textureIdObj = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
+                    long textureIdLong = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
+                    RenderSystem.setShaderTexture(0, (int) textureIdLong);
                     BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE_COLOR);
                     boolean anyVertices = false;
 
@@ -259,7 +260,7 @@ public class MixinCustomImGuiImplGl3 {
                         }
 
                         // Order MUST match format: POSITION -> TEXTURE -> COLOR
-                        bufferBuilder.vertex(x, y, 0).texture(u, v).color(r, g, b, 255);
+                        bufferBuilder.vertex(x, y, 0).texture(u, v).color(r, g, b, a);
                         anyVertices = true;
                     }
 
