@@ -266,6 +266,8 @@ public class MixinCustomImGuiImplGl3 {
                     //         (int) (clipMaxX - clipMinX),
                     //         (int) (clipMaxY - clipMinY)
                     // );
+                    RenderSystem.disableScissor();
+
                     int elemCount = drawData.getCmdListCmdBufferElemCount(n, cmdIdx);
                     int idxOffset = drawData.getCmdListCmdBufferIdxOffset(n, cmdIdx);
                     int vtxOffset = drawData.getCmdListCmdBufferVtxOffset(n, cmdIdx);
@@ -328,7 +330,7 @@ public class MixinCustomImGuiImplGl3 {
                         }
 
                         // Order MUST match format: POSITION -> TEXTURE -> COLOR
-                        bufferBuilder.vertex(x, y, 0).texture(u, v).color(r, g, b, a);
+                        bufferBuilder.vertex(x, y, 400.0f).texture(u, v).color(r, g, b, a);
                         anyVertices = true;
                     }
 
