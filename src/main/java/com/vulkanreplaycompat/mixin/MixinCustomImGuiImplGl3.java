@@ -54,6 +54,42 @@ public class MixinCustomImGuiImplGl3 {
     private static boolean vrsAvailable = false;
 
     @Unique
+    private static net.minecraft.util.Identifier fontTextureId = null;
+
+    @Unique
+    private static void ensureFontTexture() {
+        if (fontTextureId != null) return;
+        try {
+            imgui.moulberry90.ImFontAtlas fontAtlas = imgui.moulberry90.ImGui.getIO().getFonts();
+            imgui.moulberry90.type.ImInt width = new imgui.moulberry90.type.ImInt();
+            imgui.moulberry90.type.ImInt height = new imgui.moulberry90.type.ImInt();
+            ByteBuffer texData = fontAtlas.getTexDataAsRGBA32(width, height);
+            if (texData != null) {
+                texData.rewind();
+                net.minecraft.client.texture.NativeImage nativeImage = new net.minecraft.client.texture.NativeImage(net.minecraft.client.texture.NativeImage.Format.RGBA, width.get(), height.get(), false);
+                for (int y = 0; y < height.get(); y++) {
+                    for (int x = 0; x < width.get(); x++) {
+                        int r = texData.get() & 0xFF;
+                        int g = texData.get() & 0xFF;
+                        int b = texData.get() & 0xFF;
+                        int a = texData.get() & 0xFF;
+                        nativeImage.setColor(x, y, (a << 24) | (r << 16) | (g << 8) | b);
+                    }
+                }
+                net.minecraft.client.texture.NativeImageBackedTexture texture = new net.minecraft.client.texture.NativeImageBackedTexture(nativeImage);
+                fontTextureId = net.minecraft.util.Identifier.of("vulkanreplaycompat", "imgui_font");
+                net.minecraft.client.MinecraftClient.getInstance().getTextureManager().registerTexture(fontTextureId, texture);
+                System.out.println("[VulkanReplayCompat] Successfully uploaded ImGui Font Texture to Vulkan!");
+            }
+        } catch (Exception e) {
+            System.err.println("[VulkanReplayCompat] Failed to upload ImGui Font Texture: " + e.getMessage());
+            e.printStackTrace();
+            // Fallback so we don't try again
+            fontTextureId = net.minecraft.util.Identifier.of("minecraft", "textures/gui/widgets.png");
+        }
+    }
+
+    @Unique
     private static void initVRenderSystem() {
         if (vrsInitialized) return;
         vrsInitialized = true;
@@ -228,8 +264,10 @@ public class MixinCustomImGuiImplGl3 {
                     int vtxOffset = drawData.getCmdListCmdBufferVtxOffset(n, cmdIdx);
 
                     // Bind the font texture for this draw call
-                    long textureIdLong = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
-                    RenderSystem.setShaderTexture(0, (int) textureIdLong);
+                    ensureFontTexture();
+                    if (fontTextureId != null) {
+                        RenderSystem.setShaderTexture(0, fontTextureId);
+                    }
                     BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE_COLOR);
                     boolean anyVertices = false;
 
