@@ -372,85 +372,83 @@ public class MixinCustomImGuiImplGl3 {
                                     
                                     java.util.function.Supplier<String> nameSupplier = () -> "ImGui RenderPass";
                                     Object renderPass = commandEncoder.getClass().getMethod("createRenderPass", 
-                                        java.util.function.Supplier.class, 
-                                        Class.forName("com.mojang.blaze3d.textures.GpuTextureView"), 
-                                        java.util.OptionalInt.class, 
-                                        Class.forName("com.mojang.blaze3d.textures.GpuTextureView"), 
-                                        java.util.OptionalDouble.class)
-                                        .invoke(commandEncoder, nameSupplier, colorAttachmentView, java.util.OptionalInt.empty(), depthAttachmentView, java.util.OptionalDouble.empty());
+            ByteBuffer idxBuffer = drawData.getCmdListIdxBufferData(n).order(ByteOrder.nativeOrder());
 
-                                    try {
-                                        float w = drawData.getDisplaySizeX() * drawData.getFramebufferScaleX();
-                                        float h = drawData.getDisplaySizeY() * drawData.getFramebufferScaleY();
-                                        org.joml.Matrix4f myProj = new org.joml.Matrix4f().setOrtho(0.0f, w, h, 0.0f, 1000.0f, 3000.0f);
-                                        org.joml.Matrix4f myView = new org.joml.Matrix4f().translation(0.0f, 0.0f, -2000.0f);
-                                        
-                                        Class<?> vrsClassM = Class.forName("net.vulkanmod.vulkan.VRenderSystem");
-                                        vrsClassM.getMethod("applyMVP", org.joml.Matrix4f.class, org.joml.Matrix4f.class)
-                                                 .invoke(null, myView, myProj);
-                                        
-                                        java.lang.reflect.Method getBuffersM = vkPipeline.getClass().getMethod("getBuffers");
-                                        java.util.List<?> uboList = (java.util.List<?>) getBuffersM.invoke(vkPipeline);
-                                        if (uboList != null) {
-                                            for (Object ubo : uboList) {
-                                                java.lang.reflect.Method setUpdateM = ubo.getClass().getMethod("setUpdate", boolean.class);
-                                                setUpdateM.invoke(ubo, true);
-                                            }
-                                        }
-                                        uploadUBOs.invoke(rendererInst, vkPipeline);
-                                    } catch (Exception e) {}
+            final int vtxStride = 20; // ImDrawVert: xy(8) + uv(8) + col(4)
+            boolean isIdx16 = (imgui.moulberry90.ImDrawData.sizeOfImDrawIdx() == 2);
 
-                                    Class<?> pipelineClass = Class.forName("net.vulkanmod.vulkan.shader.Pipeline");
-                                    pipelineClass.getMethod("bindDescriptorSets", Class.forName("org.lwjgl.vulkan.VkCommandBuffer"), int.class).invoke(vkPipeline, commandBuffer, currentFrame);
+            for (int cmdIdx = 0; cmdIdx < drawData.getCmdListCmdBufferSize(n); cmdIdx++) {
+                drawData.getCmdListCmdBufferClipRect(clipRect, n, cmdIdx);
 
-                                    Class<?> vrsClass = Class.forName("net.vulkanmod.vulkan.VRenderSystem");
-                                    vrsClass.getField("depthTest").set(null, false);
-                                    vrsClass.getField("depthMask").set(null, false);
-                                    
-                                    Class<?> drawerClass = Class.forName("net.vulkanmod.vulkan.Drawer");
-                                    vertexData.position(0);
-                                    drawerClass.getMethod("draw", java.nio.ByteBuffer.class, Class.forName("com.mojang.blaze3d.vertex.VertexFormat$class_5596"), Class.forName("com.mojang.blaze3d.vertex.VertexFormat"), int.class)
-                                        .invoke(drawerInst, vertexData, com.mojang.blaze3d.vertex.VertexFormat.DrawMode.TRIANGLES, net.minecraft.client.render.VertexFormats.POSITION_TEXTURE_COLOR, elemCount);
+                float clipMinX = clipRect.x - clipOffX;
+                float clipMinY = clipRect.y - clipOffY;
+                float clipMaxX = clipRect.z - clipOffX;
+                float clipMaxY = clipRect.w - clipOffY;
 
-                                    if (renderPass instanceof AutoCloseable) {
-                                        ((AutoCloseable) renderPass).close();
-                                    }
-                                } catch (Exception e) {
-                                    System.err.println("[VulkanReplayCompat] Failed inside RenderPass: " + e);
-                                }
-                            } catch (Exception e) {
-                                System.err.println("[VulkanReplayCompat] Failed setting up RenderPass: " + e);
-                            }
-                        }
-                    } catch (Exception e) {
-                        System.err.println("[VulkanReplayCompat] Drawer.draw failed: " + e);
-                    } finally {
-                        builtBuffer.close();
-                    }
+                if (clipMaxX <= clipMinX || clipMaxY <= clipMinY) continue;
+
+                int elemCount = drawData.getCmdListCmdBufferElemCount(n, cmdIdx);
+                int idxOffset = drawData.getCmdListCmdBufferIdxOffset(n, cmdIdx);
+                int vtxOffset = drawData.getCmdListCmdBufferVtxOffset(n, cmdIdx);
+
+                // Resolve the texture identifier securely
+                Identifier texIdentifier = Identifier.of("flashback", "font");
+                Object textureIdObj = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
+                if (textureIdObj instanceof Integer && (Integer) textureIdObj == 999999) {
+                    texIdentifier = Identifier.of("flashback", "font");
+                } else if (textureIdObj instanceof Identifier) {
+                    texIdentifier = (Identifier) textureIdObj;
                 }
-            }
-        } finally {
-            RenderSystem.getModelViewStack().popMatrix();
-            // RenderSystem.disableScissorForRenderTypeDraws();
-            if (vrsAvailable) {
-                try {
-                    vrsEnableCull.invoke(null);
-                    vrsEnableDepthTest.invoke(null);
-                    vrsDisableBlend.invoke(null);
-                } catch (Exception ignored) {}
+
+                // Enable native scissoring mapped to Minecraft's GUI scaled expectations
+                // Temporarily commented out for blackout sanity check!
+                /*
+                context.enableScissor(
+                    (int) (clipMinX / scale),
+                    (int) (clipMinY / scale),
+                    (int) (clipMaxX / scale),
+                    (int) (clipMaxY / scale)
+                );
+                */
+
+                // Fetch a native VertexConsumer mapped to GUI_TEXTURED rendering layouts
+                VertexConsumer consumer = context.getVertexConsumers().getBuffer(RenderLayer.getGuiTextured(texIdentifier));
+
+                for (int i = 0; i < elemCount; i++) {
+                    int idxByteOffset = (idxOffset + i) * (isIdx16 ? 2 : 4);
+                    if (idxByteOffset < 0 || idxByteOffset + (isIdx16 ? 2 : 4) > idxBuffer.limit()) continue;
+
+                    int index = isIdx16 ? (idxBuffer.getShort(idxByteOffset) & 0xFFFF) : idxBuffer.getInt(idxByteOffset);
+                    int base = (vtxOffset + index) * vtxStride;
+                    if (base < 0 || base + vtxStride > vtxBuffer.limit()) continue;
+
+                    float x = vtxBuffer.getFloat(base);
+                    float y = vtxBuffer.getFloat(base + 4);
+                    float u = vtxBuffer.getFloat(base + 8);
+                    float v = vtxBuffer.getFloat(base + 12);
+                    int   r = vtxBuffer.get(base + 16) & 0xFF;
+                    int   g = vtxBuffer.get(base + 17) & 0xFF;
+                    int   b = vtxBuffer.get(base + 18) & 0xFF;
+                    int   a = vtxBuffer.get(base + 19) & 0xFF;
+
+                    // Stream directly into the consumer
+                    consumer.vertex(matrix, x, y, 500.0f).texture(u, v).color(r, g, b, a);
+                }
+
+                // Flush this specific scissor batch immediately before moving to next command lists
+                context.getVertexConsumers().draw();
+                // context.disableScissor(); // Disabled for now along with enableScissor
             }
         }
+
+        context.getMatrices().pop();
     }
 
     @Inject(method = "destroyDeviceObjects", at = @At("HEAD"), cancellable = true, remap = false)
-    public void destroyDeviceObjects(CallbackInfo ci) {
-        ci.cancel();
-    }
+    public void destroyDeviceObjects(CallbackInfo ci) { ci.cancel(); }
 
     @Inject(method = "destroyFontsTexture", at = @At("HEAD"), cancellable = true, remap = false)
-    public void destroyFontsTexture(CallbackInfo ci) {
-        ci.cancel();
-    }
+    public void destroyFontsTexture(CallbackInfo ci) { ci.cancel(); }
 
     @Inject(method = "createDeviceObjects", at = @At("HEAD"), cancellable = true, remap = false)
     public void createDeviceObjects(org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Boolean> cir) {
@@ -464,9 +462,7 @@ public class MixinCustomImGuiImplGl3 {
                 shaderField.setAccessible(true);
                 shaderField.set(dataObj, 1);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
     @Inject(method = "updateFontsTexture", at = @At("HEAD"), cancellable = true, remap = false)
@@ -494,13 +490,11 @@ public class MixinCustomImGuiImplGl3 {
 
             net.minecraft.client.texture.NativeImageBackedTexture tex =
                 new net.minecraft.client.texture.NativeImageBackedTexture(() -> "flashback_font", img);
-            net.minecraft.util.Identifier id = net.minecraft.util.Identifier.of("flashback", "font");
-            net.minecraft.client.MinecraftClient.getInstance().getTextureManager().registerTexture(id, tex);
+            Identifier id = Identifier.of("flashback", "font");
+            MinecraftClient.getInstance().getTextureManager().registerTexture(id, tex);
 
-            // Mark the font atlas with our sentinel texture ID (999999 = NativeImage-backed, not GL)
             fonts.setTexID(999999);
 
-            // Also patch the internal "fontTexture" field so the normal GL path doesn't re-upload
             java.lang.reflect.Field dataField = this.getClass().getDeclaredField("data");
             dataField.setAccessible(true);
             Object dataObj = dataField.get(this);
@@ -511,8 +505,7 @@ public class MixinCustomImGuiImplGl3 {
                     fontTextureField.set(dataObj, 999999);
                 } catch (NoSuchFieldException ignored) {}
             }
-
-            System.out.println("[VulkanReplayCompat] Font atlas uploaded: " + w + "x" + h);
+            System.out.println("[VulkanReplayCompat] Font atlas registered to asset manager successfully.");
         } catch (Exception e) {
             System.err.println("[VulkanReplayCompat] updateFontsTexture failed: " + e.getMessage());
             e.printStackTrace();

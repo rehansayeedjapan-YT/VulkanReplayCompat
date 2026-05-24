@@ -15,14 +15,21 @@ public class MixinInGameHud {
     public void onRender(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
         try {
             Class<?> replayUIClass = Class.forName("com.moulberry.flashback.editor.ui.ReplayUI");
+            
+            // Store context & flag before invoking the UI draw
             com.vulkanreplaycompat.BridgeState.isOurCall = true;
-            // System.out.println("[VulkanReplayCompat] Invoking ReplayUI.drawOverlay()");
+            com.vulkanreplaycompat.BridgeState.currentContext = context;
+            
             replayUIClass.getMethod("drawOverlay").invoke(null);
+            
+            // Clean up states
             com.vulkanreplaycompat.BridgeState.isOurCall = false;
+            com.vulkanreplaycompat.BridgeState.currentContext = null;
         } catch (Throwable t) {
             System.err.println("[VulkanReplayCompat] Error in InGameHud.render:");
             t.printStackTrace();
             com.vulkanreplaycompat.BridgeState.isOurCall = false;
+            com.vulkanreplaycompat.BridgeState.currentContext = null;
         }
     }
 }
