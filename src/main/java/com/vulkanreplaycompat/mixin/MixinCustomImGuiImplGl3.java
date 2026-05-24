@@ -64,6 +64,16 @@ public class MixinCustomImGuiImplGl3 {
     }
 
     @Unique
+    private static boolean checkVrsAvailable() {
+        try {
+            Class.forName("net.vulkanmod.vulkan.VRenderSystem");
+            return false; // FORCE VANILLA PATH
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
+    @Unique
     private static void initVRenderSystem() {
         if (vrsInitialized) return;
         vrsInitialized = true;
@@ -79,7 +89,7 @@ public class MixinCustomImGuiImplGl3 {
             vrsEnableBlend     = cls.getMethod("enableBlend");
             vrsDisableBlend    = cls.getMethod("disableBlend");
             vrsBlendFunc       = cls.getMethod("blendFunc", int.class, int.class);
-            vrsAvailable = true;
+            vrsAvailable = false; // FORCE VANILLA PATH
         } catch (Exception e) {
             System.err.println("[VulkanReplayCompat] VRenderSystem not found: " + e.getMessage());
         }

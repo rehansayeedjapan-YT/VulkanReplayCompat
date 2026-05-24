@@ -1,0 +1,1 @@
+import net.minecraft.client.gl.RenderPipelines; public class Test4 { public static void main(String[] args) { try { System.out.println("Pipeline: " + RenderPipelines.GUI_TEXTURED); } catch(Exception e){} } }

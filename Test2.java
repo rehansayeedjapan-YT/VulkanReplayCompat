@@ -1,0 +1,1 @@
+import net.minecraft.client.gl.RenderPipelines; public class Test2 { public static void main(String[] args) { for (java.lang.reflect.Field f : RenderPipelines.class.getFields()) { System.out.println("F " + f.getName()); } } }
