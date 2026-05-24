@@ -388,9 +388,14 @@ public class MixinCustomImGuiImplGl3 {
                                         .invoke(commandEncoder, nameSupplier, colorAttachmentView, java.util.OptionalInt.empty(), depthAttachmentView, java.util.OptionalDouble.empty());
 
                                     try {
+                                        float w = drawData.getDisplaySizeX() * drawData.getFramebufferScaleX();
+                                        float h = drawData.getDisplaySizeY() * drawData.getFramebufferScaleY();
+                                        org.joml.Matrix4f myProj = new org.joml.Matrix4f().setOrtho(0.0f, w, h, 0.0f, 1000.0f, 3000.0f);
+                                        org.joml.Matrix4f myView = new org.joml.Matrix4f().translation(0.0f, 0.0f, -2000.0f);
+                                        
                                         Class<?> vrsClassM = Class.forName("net.vulkanmod.vulkan.VRenderSystem");
-                                        vrsClassM.getMethod("applyModelViewMatrix", org.joml.Matrix4f.class).invoke(null, com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrix());
-                                        vrsClassM.getMethod("applyProjectionMatrix", org.joml.Matrix4f.class).invoke(null, com.mojang.blaze3d.systems.RenderSystem.getProjectionMatrix());
+                                        vrsClassM.getMethod("applyModelViewMatrix", org.joml.Matrix4f.class).invoke(null, myView);
+                                        vrsClassM.getMethod("applyProjectionMatrix", org.joml.Matrix4f.class).invoke(null, myProj);
                                         vrsClassM.getMethod("calculateMVP").invoke(null);
                                         
                                         java.lang.reflect.Method getBuffersM = vkPipeline.getClass().getMethod("getBuffers");
