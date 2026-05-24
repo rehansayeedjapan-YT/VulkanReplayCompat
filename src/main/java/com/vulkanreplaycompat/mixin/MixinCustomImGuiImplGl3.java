@@ -356,16 +356,17 @@ public class MixinCustomImGuiImplGl3 {
                                     net.minecraft.client.texture.AbstractTexture tex = 
                                         net.minecraft.client.MinecraftClient.getInstance().getTextureManager().getTexture(fontTextureId);
                                     if (tex != null) {
-                                        tex.bindTexture(); // Force upload if not uploaded yet!
-                                        Class<?> vkGlTextureClass = Class.forName("net.vulkanmod.gl.VkGlTexture");
-                                        Object vkGlTex = vkGlTextureClass.getMethod("getTexture", int.class).invoke(null, tex.getGlId());
-                                        if (vkGlTex != null) {
-                                            Object vulkanImage = vkGlTex.getClass().getMethod("getVulkanImage").invoke(vkGlTex);
-                                            if (vulkanImage != null) {
-                                                Class<?> vulkanImageClass = Class.forName("net.vulkanmod.vulkan.texture.VulkanImage");
-                                                vtsClass.getMethod("bindTexture", int.class, vulkanImageClass).invoke(null, 0, vulkanImage);
+                                        try {
+                                            if (tex instanceof net.minecraft.client.texture.NativeImageBackedTexture) {
+                                                ((net.minecraft.client.texture.NativeImageBackedTexture)tex).upload();
                                             }
-                                        }
+                                            Object texView = tex.getClass().getMethod("getGlTextureView").invoke(tex);
+                                            Class<?> vrsClass = Class.forName("net.vulkanmod.vulkan.VRenderSystem");
+                                            vrsClass.getMethod("setShaderTexture", int.class, Class.forName("com.mojang.blaze3d.textures.GpuTextureView")).invoke(null, 0, texView);
+                                            
+                                            // Then tell VTextureSelector to update descriptor sets
+                                            vtsClass.getMethod("bindShaderTextures", Class.forName("net.vulkanmod.vulkan.shader.Pipeline")).invoke(null, vkPipeline);
+                                        } catch (Exception e) {}
                                     }
 
                                     Class<?> rendererClass = Class.forName("net.vulkanmod.vulkan.Renderer");
