@@ -49,10 +49,10 @@ public class MixinCustomImGuiImplGl3 {
         // We push a transformation matrix to invert the GUI scale factor so raw pixel inputs map accurately.
         float scale = (float) MinecraftClient.getInstance().getWindow().getScaleFactor();
 
-        context.getMatrices().push();
+        context.getMatrices().pushMatrix();
         context.getMatrices().identity();
-        context.getMatrices().scale(1.0f / scale, 1.0f / scale, 1.0f);
-        Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
+        context.getMatrices().scale(1.0f / scale, 1.0f / scale);
+        Matrix4f matrix = new Matrix4f().set(context.getMatrices());
 
         ImVec4 clipRect = new ImVec4();
 
@@ -103,7 +103,8 @@ public class MixinCustomImGuiImplGl3 {
                 */
 
                 // Fetch a native VertexConsumer mapped to GUI_TEXTURED rendering layouts
-                VertexConsumer consumer = context.getVertexConsumers().getBuffer(RenderLayer.getGuiTextured(texIdentifier));
+                net.minecraft.client.render.VertexConsumerProvider.Immediate consumers = MinecraftClient.getInstance().getBufferBuilders().getEntityVertexConsumers();
+                VertexConsumer consumer = consumers.getBuffer(RenderLayer.getGuiTextured(texIdentifier));
 
                 for (int i = 0; i < elemCount; i++) {
                     int idxByteOffset = (idxOffset + i) * (isIdx16 ? 2 : 4);
@@ -127,12 +128,12 @@ public class MixinCustomImGuiImplGl3 {
                 }
 
                 // Flush this specific scissor batch immediately before moving to next command lists
-                context.getVertexConsumers().draw();
+                consumers.draw();
                 // context.disableScissor(); // Disabled for now along with enableScissor
             }
         }
 
-        context.getMatrices().pop();
+        context.getMatrices().popMatrix();
     }
 
     @Inject(method = "destroyDeviceObjects", at = @At("HEAD"), cancellable = true, remap = false)
