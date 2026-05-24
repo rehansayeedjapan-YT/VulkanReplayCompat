@@ -149,7 +149,7 @@ public class MixinCustomImGuiImplGl3 {
         Method uploadUBOs     = null;
         Method pushConstants  = null;
         try {
-            Object mcPipeline = net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED;
+            Object mcPipeline = Class.forName("net.vulkanmod.render.shader.CustomRenderPipelines").getField("GUI_TRIANGLES").get(null);
             Class<?> extClass = Class.forName("net.vulkanmod.interfaces.shader.ExtendedRenderPipeline");
             if (extClass.isInstance(mcPipeline)) {
                 vkPipeline   = extClass.getMethod("getPipeline").invoke(mcPipeline);
@@ -330,7 +330,7 @@ public class MixinCustomImGuiImplGl3 {
                             } catch (Exception e) {}
                         }
 
-                        if (drawerDraw != null && drawerInst != null && vertexData != null) {
+                        if (drawerDraw != null && drawerInst != null && vertexData != null && vkPipeline != null) {
                             vertexData.position(0); // <--- ENSURE BUFFER IS AT ZERO
                             drawerDraw.invoke(drawerInst,
                                     vertexData,
