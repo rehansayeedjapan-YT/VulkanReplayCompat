@@ -181,15 +181,16 @@ public class MixinCustomImGuiImplGl3 {
             try {
                 Class<?> vrsClass = Class.forName("net.vulkanmod.vulkan.VRenderSystem");
                 vrsClass.getMethod("setShaderColor", float.class, float.class, float.class, float.class).invoke(null, 1.0f, 1.0f, 1.0f, 1.0f);
-                org.joml.Matrix4f projection = new org.joml.Matrix4f().ortho(0, fbWidth, fbHeight, 0, 1000, 3000);
-                org.joml.Matrix4f modelView = new org.joml.Matrix4f().translation(0, 0, -2000);
-                vrsClass.getMethod("applyMVP", org.joml.Matrix4f.class, org.joml.Matrix4f.class).invoke(null, modelView, projection);
             } catch (Exception e) {}
 
             try {
                 Class<?> rendererClass = Class.forName("net.vulkanmod.vulkan.Renderer");
                 Object rendererInst2 = rendererClass.getMethod("getInstance").invoke(null);
                 rendererClass.getMethod("beginFrame").invoke(rendererInst2);
+                int physWidth = net.minecraft.client.MinecraftClient.getInstance().getWindow().getFramebufferWidth();
+                int physHeight = net.minecraft.client.MinecraftClient.getInstance().getWindow().getFramebufferHeight();
+                rendererClass.getMethod("setViewportState", int.class, int.class, int.class, int.class).invoke(null, 0, 0, physWidth, physHeight);
+                rendererClass.getMethod("setScissor", int.class, int.class, int.class, int.class).invoke(null, 0, 0, physWidth, physHeight);
             } catch (Exception e) {
                 System.err.println("[VulkanReplayCompat] Failed to beginFrame: " + e.getMessage());
             }
