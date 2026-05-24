@@ -305,6 +305,17 @@ public class MixinCustomImGuiImplGl3 {
                         if (vkPipeline != null && rendererInst != null) {
                             try {
                                 bindPipeline.invoke(rendererInst, vkPipeline);
+                                
+                                try {
+                                    Class<?> vtsClass = Class.forName("net.vulkanmod.vulkan.texture.VTextureSelector");
+                                    vtsClass.getMethod("bindShaderTextures", Class.forName("net.vulkanmod.vulkan.shader.Pipeline")).invoke(null, vkPipeline);
+                                    
+                                    Class<?> rendererClass = Class.forName("net.vulkanmod.vulkan.Renderer");
+                                    Object commandBuffer = rendererClass.getMethod("getCommandBuffer").invoke(null);
+                                    int currentFrame = (int) rendererClass.getMethod("getCurrentFrame").invoke(null);
+                                    vkPipeline.getClass().getMethod("bindDescriptorSets", Class.forName("org.lwjgl.vulkan.VkCommandBuffer"), int.class).invoke(vkPipeline, commandBuffer, currentFrame);
+                                } catch (Exception e) {}
+                                
                                 try {
                                     java.lang.reflect.Method getBuffersM = vkPipeline.getClass().getMethod("getBuffers");
                                     java.util.List<?> uboList = (java.util.List<?>) getBuffersM.invoke(vkPipeline);
