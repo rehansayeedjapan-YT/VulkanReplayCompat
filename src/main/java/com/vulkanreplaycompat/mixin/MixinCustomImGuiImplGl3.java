@@ -355,11 +355,6 @@ public class MixinCustomImGuiImplGl3 {
                                             setUpdateM.invoke(ubo, true);
                                         }
                                     }
-                                    RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-                                    RenderSystem.disableDepthTest();
-                                    RenderSystem.disableCull();
-                                    RenderSystem.enableBlend();
-                                    RenderSystem.defaultBlendFunc();
                                     uploadUBOs.invoke(rendererInst, vkPipeline);
                                 } catch (Exception e) {}
                             } catch (Exception e) {}
