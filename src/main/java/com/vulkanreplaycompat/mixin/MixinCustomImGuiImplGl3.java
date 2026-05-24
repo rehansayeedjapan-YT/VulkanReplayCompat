@@ -250,7 +250,7 @@ public class MixinCustomImGuiImplGl3 {
                             }
                         } catch (Exception e) {}
                     }
-                    BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE_COLOR);
+                    BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR_TEXTURE);
                     boolean anyVertices = false;
 
                     for (int i = 0; i < elemCount; i++) {
@@ -286,8 +286,8 @@ public class MixinCustomImGuiImplGl3 {
                             } catch (Exception e) {}
                         }
 
-                        // Order MUST match format: POSITION -> TEXTURE -> COLOR
-                        bufferBuilder.vertex(x, y, 0).texture(u, v).color(r, g, b, a);
+                        // Order MUST match format: POSITION -> COLOR -> TEXTURE
+                        bufferBuilder.vertex(x, y, 0).color(r, g, b, a).texture(u, v);
                         anyVertices = true;
                     }
 
@@ -335,7 +335,7 @@ public class MixinCustomImGuiImplGl3 {
                             drawerDraw.invoke(drawerInst,
                                     vertexData,
                                     VertexFormat.DrawMode.TRIANGLES,
-                                    VertexFormats.POSITION_TEXTURE_COLOR,
+                                    VertexFormats.POSITION_COLOR_TEXTURE,
                                     elemCount);
                         }
                     } catch (Exception e) {
