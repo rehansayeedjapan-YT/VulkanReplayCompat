@@ -364,34 +364,62 @@ public class MixinCustomImGuiImplGl3 {
                                             vtsClass.getMethod("bindShaderTextures", Class.forName("net.vulkanmod.vulkan.shader.Pipeline")).invoke(null, vkPipeline);
                                         } catch (Exception e) {}
                                     }
-
                                     Class<?> rendererClass = Class.forName("net.vulkanmod.vulkan.Renderer");
                                     Object commandBuffer = rendererClass.getMethod("getCommandBuffer").invoke(null);
                                     int currentFrame = (int) rendererClass.getMethod("getCurrentFrame").invoke(null);
-                                    vkPipeline.getClass().getMethod("bindDescriptorSets", Class.forName("org.lwjgl.vulkan.VkCommandBuffer"), int.class).invoke(vkPipeline, commandBuffer, currentFrame);
-                                } catch (Exception e) {}
-                                
-                                try {
-                                    java.lang.reflect.Method getBuffersM = vkPipeline.getClass().getMethod("getBuffers");
-                                    java.util.List<?> uboList = (java.util.List<?>) getBuffersM.invoke(vkPipeline);
-                                    if (uboList != null) {
-                                        for (Object ubo : uboList) {
-                                            java.lang.reflect.Method setUpdateM = ubo.getClass().getMethod("setUpdate", boolean.class);
-                                            setUpdateM.invoke(ubo, true);
-                                        }
-                                    }
-                                    uploadUBOs.invoke(rendererInst, vkPipeline);
-                                } catch (Exception e) {}
-                            } catch (Exception e) {}
-                        }
+                                    
+                                    // Vulkan requires drawing to happen inside an active RenderPass.
+                                    // We create one using Vanilla's API which VulkanMod implements and translates to vkCmdBeginRenderPass.
+                                    Class<?> renderSystemClass = Class.forName("com.mojang.blaze3d.systems.RenderSystem");
+                                    Object device = renderSystemClass.getMethod("getDevice").invoke(null);
+                                    Object commandEncoder = device.getClass().getMethod("createCommandEncoder").invoke(device);
+                                    
+                                    Object framebuffer = net.minecraft.client.MinecraftClient.getInstance().getFramebuffer();
+                                    Object colorAttachmentView = framebuffer.getClass().getMethod("method_71639").invoke(framebuffer);
+                                    Object depthAttachmentView = framebuffer.getClass().getMethod("method_71640").invoke(framebuffer);
+                                    
+                                    java.util.function.Supplier<String> nameSupplier = () -> "ImGui RenderPass";
+                                    Object renderPass = commandEncoder.getClass().getMethod("createRenderPass", 
+                                        java.util.function.Supplier.class, 
+                                        Class.forName("com.mojang.blaze3d.textures.GpuTextureView"), 
+                                        java.util.OptionalInt.class, 
+                                        Class.forName("com.mojang.blaze3d.textures.GpuTextureView"), 
+                                        java.util.OptionalDouble.class)
+                                        .invoke(commandEncoder, nameSupplier, colorAttachmentView, java.util.OptionalInt.empty(), depthAttachmentView, java.util.OptionalDouble.empty());
 
-                        if (drawerDraw != null && drawerInst != null && vertexData != null && vkPipeline != null) {
-                            vertexData.position(0); // <--- ENSURE BUFFER IS AT ZERO
-                            drawerDraw.invoke(drawerInst,
-                                    vertexData,
-                                    VertexFormat.DrawMode.TRIANGLES,
-                                    VertexFormats.POSITION_TEXTURE_COLOR,
-                                    elemCount);
+                                    try {
+                                        java.lang.reflect.Method getBuffersM = vkPipeline.getClass().getMethod("getBuffers");
+                                        java.util.List<?> uboList = (java.util.List<?>) getBuffersM.invoke(vkPipeline);
+                                        if (uboList != null) {
+                                            for (Object ubo : uboList) {
+                                                java.lang.reflect.Method setUpdateM = ubo.getClass().getMethod("setUpdate", boolean.class);
+                                                setUpdateM.invoke(ubo, true);
+                                            }
+                                        }
+                                        uploadUBOs.invoke(rendererInst, vkPipeline);
+                                    } catch (Exception e) {}
+
+                                    Class<?> pipelineClass = Class.forName("net.vulkanmod.vulkan.shader.Pipeline");
+                                    pipelineClass.getMethod("bindDescriptorSets", Class.forName("org.lwjgl.vulkan.VkCommandBuffer"), int.class).invoke(vkPipeline, commandBuffer, currentFrame);
+
+                                    Class<?> vrsClass = Class.forName("net.vulkanmod.vulkan.VRenderSystem");
+                                    vrsClass.getField("depthTest").set(null, false);
+                                    vrsClass.getField("depthMask").set(null, false);
+                                    
+                                    Class<?> drawerClass = Class.forName("net.vulkanmod.vulkan.Drawer");
+                                    vertexData.position(0);
+                                    drawerClass.getMethod("draw", java.nio.ByteBuffer.class, Class.forName("com.mojang.blaze3d.vertex.VertexFormat$class_5596"), Class.forName("com.mojang.blaze3d.vertex.VertexFormat"), int.class)
+                                        .invoke(drawerInst, vertexData, com.mojang.blaze3d.vertex.VertexFormat.DrawMode.TRIANGLES, net.minecraft.client.render.VertexFormats.POSITION_TEXTURE_COLOR, elemCount);
+
+                                    if (renderPass instanceof AutoCloseable) {
+                                        ((AutoCloseable) renderPass).close();
+                                    }
+                                } catch (Exception e) {
+                                    System.err.println("[VulkanReplayCompat] Failed inside RenderPass: " + e);
+                                }
+                            } catch (Exception e) {
+                                System.err.println("[VulkanReplayCompat] Failed setting up RenderPass: " + e);
+                            }
                         }
                     } catch (Exception e) {
                         System.err.println("[VulkanReplayCompat] Drawer.draw failed: " + e);
