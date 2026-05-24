@@ -1,0 +1,12 @@
+build/
+.gradle/
+*.txt
+*.jar
+*.class
+flashback_decompiled*.java
+com/
+imgui/
+launch.log
+.idea/
+*.iml
+.vscode/

@@ -1,0 +1,22 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.vulkanreplaycompat.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+  ],
+  "client": [
+    "MixinOpenGlFrameCapturer",
+    "MixinPboOpenGlFrameCapturer",
+    "MixinProgram",
+    "MixinVideoRenderer",
+    "MixinSaveableFramebuffer",
+    "MixinCustomImGuiImplGl3",
+    "MixinGL11GlGetIntegerv",
+    "MixinReplayUI",
+    "MixinInGameHud"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

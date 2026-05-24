@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "flashback_vulkan_bridge",
+  "version": "${version}",
+  "name": "Flashback Vulkan Bridge",
+  "description": "Provides rendering compatibility between Flashback (ImGui) and VulkanMod on Minecraft 1.21.11.",
+  "authors": [
+    "Rehan"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/vulkanreplaycompat/icon.png",
+  "environment": "client",
+  "entrypoints": {},
+  "mixins": [
+    "vulkanreplaycompat.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.14.22",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*",
+    "vulkanmod": "*"
+  }
+}
