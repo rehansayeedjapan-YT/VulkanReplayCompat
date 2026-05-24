@@ -255,7 +255,7 @@ public class MixinCustomImGuiImplGl3 {
                             }
                         } catch (Exception e) {}
                     }
-                    BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR_TEXTURE);
+                    BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE_COLOR);
                     boolean anyVertices = false;
 
                     for (int i = 0; i < elemCount; i++) {
@@ -281,16 +281,22 @@ public class MixinCustomImGuiImplGl3 {
                         int   a = vtxBuffer.get(base + 19) & 0xFF;
 
                         if (i == 0 && System.currentTimeMillis() % 1000 < 50) {
-                            System.out.println("[VulkanReplayCompat] Vertex 0: base=" + base + " x=" + x + " y=" + y + " r=" + r + " g=" + g + " b=" + b + " a=" + a);
+                            try {
+                                System.out.println("[VulkanReplayCompat] DUMPING VertexFormats:");
+                                for (java.lang.reflect.Field f : VertexFormats.class.getDeclaredFields()) {
+                                    if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) && f.getType() == VertexFormat.class) {
+                                        System.out.println("Format Field: " + f.getName());
+                                    }
+                                }
+                            } catch (Exception e) {}
                         }
 
-                        // Order MUST match format: POSITION -> COLOR -> TEXTURE
-                        bufferBuilder.vertex(x, y, 0).color(r, g, b, a).texture(u, v);
+                        // Order MUST match format: POSITION -> TEXTURE -> COLOR
+                        bufferBuilder.vertex(x, y, 0).texture(u, v).color(r, g, b, a);
                         anyVertices = true;
                     }
 
                     if (!anyVertices) {
-                        // BufferBuilder was started but has no data — end it to avoid leaks
                         BuiltBuffer empty = bufferBuilder.endNullable();
                         if (empty != null) empty.close();
                         continue;
@@ -308,9 +314,6 @@ public class MixinCustomImGuiImplGl3 {
                                     java.lang.reflect.Method getBuffersM = vkPipeline.getClass().getMethod("getBuffers");
                                     java.util.List<?> uboList = (java.util.List<?>) getBuffersM.invoke(vkPipeline);
                                     if (uboList != null) {
-                                        if (System.currentTimeMillis() % 1000 < 50) {
-                                            System.out.println("[VulkanReplayCompat] Forcing UBO updates! Count: " + uboList.size());
-                                        }
                                         for (Object ubo : uboList) {
                                             java.lang.reflect.Method setUpdateM = ubo.getClass().getMethod("setUpdate", boolean.class);
                                             setUpdateM.invoke(ubo, true);
@@ -318,14 +321,7 @@ public class MixinCustomImGuiImplGl3 {
                                     }
                                 } catch (Exception ignored) {}
                                 uploadUBOs.invoke(rendererInst, vkPipeline);
-                            } catch (Exception e) {
-                                System.err.println("[VulkanReplayCompat] Pipeline bind failed:");
-                                e.printStackTrace();
-                                if (e instanceof java.lang.reflect.InvocationTargetException) {
-                                    System.err.println("Cause:");
-                                    ((java.lang.reflect.InvocationTargetException)e).getCause().printStackTrace();
-                                }
-                            }
+                            } catch (Exception e) {}
                         }
 
                         if (drawerDraw != null && drawerInst != null && vertexData != null) {
@@ -333,7 +329,7 @@ public class MixinCustomImGuiImplGl3 {
                             drawerDraw.invoke(drawerInst,
                                     vertexData,
                                     VertexFormat.DrawMode.TRIANGLES,
-                                    VertexFormats.POSITION_COLOR_TEXTURE,
+                                    VertexFormats.POSITION_TEXTURE_COLOR,
                                     elemCount);
                         }
                     } catch (Exception e) {
