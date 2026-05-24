@@ -58,11 +58,8 @@ public class MixinCustomImGuiImplGl3 {
 
     @Unique
     private static void ensureFontTexture() {
-        if (fontTextureId != null) return;
-        try {
-            fontTextureId = net.minecraft.util.Identifier.of("minecraft", "textures/block/dirt.png");
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (fontTextureId == null) {
+            fontTextureId = net.minecraft.util.Identifier.of("flashback", "font");
         }
     }
 
@@ -198,14 +195,12 @@ public class MixinCustomImGuiImplGl3 {
 
             try {
                 Class<?> rendererClass = Class.forName("net.vulkanmod.vulkan.Renderer");
-                Object rendererInst2 = rendererClass.getMethod("getInstance").invoke(null);
-                rendererClass.getMethod("beginFrame").invoke(rendererInst2);
                 int physWidth = net.minecraft.client.MinecraftClient.getInstance().getWindow().getFramebufferWidth();
                 int physHeight = net.minecraft.client.MinecraftClient.getInstance().getWindow().getFramebufferHeight();
                 rendererClass.getMethod("setViewportState", int.class, int.class, int.class, int.class).invoke(null, 0, 0, physWidth, physHeight);
                 rendererClass.getMethod("setScissor", int.class, int.class, int.class, int.class).invoke(null, 0, 0, physWidth, physHeight);
             } catch (Exception e) {
-                System.err.println("[VulkanReplayCompat] Failed to beginFrame: " + e.getMessage());
+                System.err.println("[VulkanReplayCompat] Failed to setup viewport/scissor: " + e.getMessage());
             }
 
             for (int n = 0; n < drawData.getCmdListsCount(); n++) {
