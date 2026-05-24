@@ -137,6 +137,7 @@ public class MixinCustomImGuiImplGl3 {
         Object rendererInst   = null;
         Method bindPipeline   = null;
         Method uploadUBOs     = null;
+        Method pushConstants  = null;
         try {
             Object mcPipeline = net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED;
             Class<?> extClass = Class.forName("net.vulkanmod.interfaces.shader.ExtendedRenderPipeline");
@@ -147,6 +148,7 @@ public class MixinCustomImGuiImplGl3 {
                 Class<?> basePipeClass  = Class.forName("net.vulkanmod.vulkan.shader.Pipeline");
                 bindPipeline  = rendererInst.getClass().getMethod("bindGraphicsPipeline", graphPipeClass);
                 uploadUBOs    = rendererInst.getClass().getMethod("uploadAndBindUBOs",    basePipeClass);
+                pushConstants = rendererInst.getClass().getMethod("pushConstants",        basePipeClass);
             }
         } catch (Exception e) {
             System.err.println("[VulkanReplayCompat] Could not resolve VulkanMod pipeline: " + e.getMessage());
@@ -179,6 +181,9 @@ public class MixinCustomImGuiImplGl3 {
             try {
                 Class<?> vrsClass = Class.forName("net.vulkanmod.vulkan.VRenderSystem");
                 vrsClass.getMethod("setShaderColor", float.class, float.class, float.class, float.class).invoke(null, 1.0f, 1.0f, 1.0f, 1.0f);
+                org.joml.Matrix4f projection = new org.joml.Matrix4f().ortho(0, fbWidth, fbHeight, 0, 1000, 3000);
+                org.joml.Matrix4f modelView = new org.joml.Matrix4f().translation(0, 0, -2000);
+                vrsClass.getMethod("applyMVP", org.joml.Matrix4f.class, org.joml.Matrix4f.class).invoke(null, modelView, projection);
             } catch (Exception e) {}
 
             for (int n = 0; n < drawData.getCmdListsCount(); n++) {
@@ -215,30 +220,6 @@ public class MixinCustomImGuiImplGl3 {
 
                     // Bind the font texture for this draw call
                     Object textureIdObj = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
-                    if (textureIdObj instanceof Integer && (Integer) textureIdObj == 999999) {
-                        try {
-                            net.minecraft.client.texture.AbstractTexture tex =
-                                net.minecraft.client.MinecraftClient.getInstance()
-                                    .getTextureManager()
-                                    .getTexture(net.minecraft.util.Identifier.of("flashback", "font"));
-                            if (tex != null) {
-                                Class<?> vrsClass      = Class.forName("net.vulkanmod.vulkan.VRenderSystem");
-                                Class<?> gpuTexViewCls = Class.forName("com.mojang.blaze3d.textures.GpuTextureView");
-                                vrsClass.getMethod("setShaderTexture", int.class, gpuTexViewCls)
-                                        .invoke(null, 0, tex.getGlTextureView());
-                            } else {
-                                if (cmdIdx == 0 && System.currentTimeMillis() % 1000 < 50) {
-                                    System.err.println("[VulkanReplayCompat] FONT TEXTURE IS NULL! UI WILL BE INVISIBLE!");
-                                }
-                            }
-                        } catch (Exception e) {
-                            if (cmdIdx == 0 && System.currentTimeMillis() % 1000 < 50) {
-                                System.err.println("[VulkanReplayCompat] FONT TEXTURE BIND ERROR: " + e);
-                            }
-                        }
-                    }
-
-                    // Rebuild vertices via MC BufferBuilder so the format matches exactly
                     BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_TEXTURE_COLOR);
                     boolean anyVertices = false;
 
@@ -300,6 +281,9 @@ public class MixinCustomImGuiImplGl3 {
                                     }
                                 } catch (Exception ignored) {}
                                 uploadUBOs.invoke(rendererInst, vkPipeline);
+                                if (pushConstants != null) {
+                                    pushConstants.invoke(rendererInst, vkPipeline);
+                                }
                             } catch (Exception e) {
                                 System.err.println("[VulkanReplayCompat] Pipeline bind failed: " + e);
                             }
