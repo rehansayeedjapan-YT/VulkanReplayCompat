@@ -1,0 +1,242 @@
+package com.vulkanreplaycompat.mixin;
+
+import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.render.BufferBuilder;
+import net.minecraft.client.render.BufferRenderer;
+import net.minecraft.client.render.Tessellator;
+import net.minecraft.client.render.VertexFormat;
+import net.minecraft.client.render.VertexFormats;
+import imgui.moulberry90.ImDrawData;
+import imgui.moulberry90.ImFontAtlas;
+import imgui.moulberry90.type.ImInt;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.GameRenderer;
+import net.minecraft.client.texture.NativeImage;
+import net.minecraft.client.texture.NativeImageBackedTexture;
+import net.minecraft.util.Identifier;
+import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
+@Mixin(targets = "com.moulberry.flashback.editor.ui.CustomImGuiImplGl3", remap = false)
+public class MixinCustomImGuiImplGl3 {
+    private static Identifier fontTextureId = null;
+    private static NativeImageBackedTexture fontTextureObj = null;
+
+    @Inject(method = "init(Ljava/lang/String;)Z", at = @At("HEAD"), cancellable = true)
+    private void safeInit(String glslVersion, CallbackInfoReturnable<Boolean> cir) {
+        try {
+            Method newDataMethod = this.getClass().getDeclaredMethod("newData");
+            newDataMethod.setAccessible(true);
+            Object newData = newDataMethod.invoke(this);
+
+            setFieldReflective(this, "data", newData);
+
+            try {
+                Class<?> replayUIClass = Class.forName("com.moulberry.flashback.editor.ui.ReplayUI");
+                Method getIO = replayUIClass.getDeclaredMethod("getIO");
+                getIO.setAccessible(true);
+                Object io = getIO.invoke(null);
+
+                io.getClass().getDeclaredMethod("setBackendRendererName", String.class).invoke(io, "imgui-java_impl_vulkan_minecraft");
+                io.getClass().getDeclaredMethod("addBackendFlags", int.class).invoke(io, 8);
+                io.getClass().getDeclaredMethod("addBackendFlags", int.class).invoke(io, 4096);
+            } catch (Exception ioEx) { }
+
+            setFieldReflective(newData, "glVersion", 330);
+            setFieldReflective(newData, "glProfileIsCompat", false);
+            setFieldReflective(newData, "glProfileMask", 0);
+            setFieldReflective(newData, "glslVersion", "#version 150");
+            setFieldReflective(newData, "shaderHandle", -1);
+            setFieldReflective(newData, "fontTexture", -1);
+            setFieldReflective(newData, "hasClipOrigin", false);
+
+            try {
+                Method initPlatform = this.getClass().getDeclaredMethod("initPlatformInterface");
+                initPlatform.setAccessible(true);
+                initPlatform.invoke(this);
+            } catch (Exception e) {}
+
+            cir.setReturnValue(true);
+        } catch (Exception e) {
+            cir.setReturnValue(false);
+        }
+    }
+
+    @Inject(method = "createDeviceObjects", at = @At("HEAD"), cancellable = true)
+    private void safeCreateDeviceObjects(CallbackInfoReturnable<Boolean> cir) {
+        try {
+            Object data = getFieldReflective(this, "data");
+            setFieldReflective(data, "shaderHandle", 1);
+        } catch (Exception e) {}
+        cir.setReturnValue(true);
+    }
+
+    @Inject(method = "updateFontsTexture", at = @At("HEAD"), cancellable = true)
+    private void safeUpdateFontsTexture(CallbackInfo ci) {
+        ci.cancel();
+        try {
+            Class<?> replayUIClass = Class.forName("com.moulberry.flashback.editor.ui.ReplayUI");
+            Method getIO = replayUIClass.getDeclaredMethod("getIO");
+            getIO.setAccessible(true);
+            Object io = getIO.invoke(null);
+
+            Method getFonts = io.getClass().getDeclaredMethod("getFonts");
+            getFonts.setAccessible(true);
+            ImFontAtlas fontAtlas = (ImFontAtlas) getFonts.invoke(io);
+
+            ImInt width = new ImInt();
+            ImInt height = new ImInt();
+            ByteBuffer buffer = fontAtlas.getTexDataAsRGBA32(width, height);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+
+            NativeImage image = new NativeImage(NativeImage.Format.RGBA, width.get(), height.get(), false);
+            for (int y = 0; y < height.get(); y++) {
+                for (int x = 0; x < width.get(); x++) {
+                    image.setColor(x, y, buffer.getInt((y * width.get() + x) * 4));
+                }
+            }
+
+            if (fontTextureObj != null) {
+                fontTextureObj.close();
+            }
+            fontTextureObj = new NativeImageBackedTexture(image);
+            fontTextureId = Identifier.of("flashback", "imgui_font_" + System.currentTimeMillis());
+            MinecraftClient.getInstance().getTextureManager().registerTexture(fontTextureId, fontTextureObj);
+
+            fontAtlas.setTexID(fontTextureObj.getGlId());
+
+            Object data = getFieldReflective(this, "data");
+            setFieldReflective(data, "fontTexture", fontTextureObj.getGlId());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Inject(method = "destroyFontsTexture", at = @At("HEAD"), cancellable = true)
+    private void safeDestroyFontsTexture(CallbackInfo ci) {
+        ci.cancel();
+        try {
+            if (fontTextureObj != null) {
+                fontTextureObj.close();
+                fontTextureObj = null;
+            }
+            Object data = getFieldReflective(this, "data");
+            setFieldReflective(data, "fontTexture", -1);
+        } catch (Exception e) {}
+    }
+
+    @Inject(method = "renderDrawData", at = @At("HEAD"), cancellable = true)
+    private void safeRenderDrawData(ImDrawData drawData, CallbackInfo ci) {
+        ci.cancel();
+
+        int fbWidth = (int) (drawData.getDisplaySizeX() * drawData.getFramebufferScaleX());
+        int fbHeight = (int) (drawData.getDisplaySizeY() * drawData.getFramebufferScaleY());
+        if (fbWidth <= 0 || fbHeight <= 0 || drawData.getCmdListsCount() <= 0) return;
+
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.disableCull();
+        RenderSystem.disableDepthTest();
+
+        Matrix4f proj = new Matrix4f().setOrtho(0.0f, fbWidth, fbHeight, 0.0f, -1.0f, 1.0f);
+        RenderSystem.setProjectionMatrix(proj, com.mojang.blaze3d.vertex.VertexSorting.ORTHOGRAPHIC_Z);
+        RenderSystem.setShader(GameRenderer::getPositionColorTexProgram);
+
+        float clipOffX = drawData.getDisplayPosX();
+        float clipOffY = drawData.getDisplayPosY();
+        float clipScaleX = drawData.getFramebufferScaleX();
+        float clipScaleY = drawData.getFramebufferScaleY();
+
+        Tessellator tessellator = Tessellator.getInstance();
+
+        for (int n = 0; n < drawData.getCmdListsCount(); n++) {
+            ByteBuffer vtxBuffer = drawData.getCmdListVtxBufferData(n);
+            vtxBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            ByteBuffer idxBuffer = drawData.getCmdListIdxBufferData(n);
+            idxBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            boolean isIdx16 = ImDrawData.sizeOfImDrawIdx() == 2;
+            int vtxStride = ImDrawData.sizeOfImDrawVert();
+
+            for (int cmdIdx = 0; cmdIdx < drawData.getCmdListCmdBufferSize(n); cmdIdx++) {
+                float clipMinX = (drawData.getCmdListCmdBufferClipRectX(n, cmdIdx) - clipOffX) * clipScaleX;
+                float clipMinY = (drawData.getCmdListCmdBufferClipRectY(n, cmdIdx) - clipOffY) * clipScaleY;
+                float clipMaxX = (drawData.getCmdListCmdBufferClipRectZ(n, cmdIdx) - clipOffX) * clipScaleX;
+                float clipMaxY = (drawData.getCmdListCmdBufferClipRectW(n, cmdIdx) - clipOffY) * clipScaleY;
+
+                if (clipMaxX <= clipMinX || clipMaxY <= clipMinY) continue;
+
+                RenderSystem.enableScissor((int) clipMinX, (int) (fbHeight - clipMaxY), (int) (clipMaxX - clipMinX), (int) (clipMaxY - clipMinY));
+
+                long textureId = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, (int) textureId);
+
+                int elemCount = drawData.getCmdListCmdBufferElemCount(n, cmdIdx);
+                int idxOffset = drawData.getCmdListCmdBufferIdxOffset(n, cmdIdx);
+                int vtxOffset = drawData.getCmdListCmdBufferVtxOffset(n, cmdIdx);
+
+                BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR_TEXTURE);
+
+                for (int i = 0; i < elemCount; i++) {
+                    int index = isIdx16 ? idxBuffer.getShort((idxOffset + i) * 2) & 0xFFFF : idxBuffer.getInt((idxOffset + i) * 4);
+                    int vertexBase = (vtxOffset + index) * vtxStride;
+                    
+                    float x = vtxBuffer.getFloat(vertexBase);
+                    float y = vtxBuffer.getFloat(vertexBase + 4);
+                    float u = vtxBuffer.getFloat(vertexBase + 8);
+                    float v = vtxBuffer.getFloat(vertexBase + 12);
+                    int color = vtxBuffer.getInt(vertexBase + 16);
+
+                    int r = color & 0xFF;
+                    int g = (color >> 8) & 0xFF;
+                    int b = (color >> 16) & 0xFF;
+                    int a = (color >> 24) & 0xFF;
+                    int argb = (a << 24) | (r << 16) | (g << 8) | b;
+
+                    bufferBuilder.vertex(x, y, 0).color(argb).texture(u, v);
+                }
+
+                BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
+            }
+        }
+        RenderSystem.disableScissor();
+    }
+
+    private static void setFieldReflective(Object target, String fieldName, Object value) throws Exception {
+        Class<?> cls = target.getClass();
+        while (cls != null) {
+            try {
+                Field f = cls.getDeclaredField(fieldName);
+                f.setAccessible(true);
+                f.set(target, value);
+                return;
+            } catch (NoSuchFieldException nsfe) {
+                cls = cls.getSuperclass();
+            }
+        }
+        throw new NoSuchFieldException(fieldName);
+    }
+    
+    private static Object getFieldReflective(Object target, String fieldName) throws Exception {
+        Class<?> cls = target.getClass();
+        while (cls != null) {
+            try {
+                Field f = cls.getDeclaredField(fieldName);
+                f.setAccessible(true);
+                return f.get(target);
+            } catch (NoSuchFieldException nsfe) {
+                cls = cls.getSuperclass();
+            }
+        }
+        throw new NoSuchFieldException(fieldName);
+    }
+}

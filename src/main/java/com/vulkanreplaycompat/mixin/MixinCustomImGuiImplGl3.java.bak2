@@ -1,0 +1,116 @@
+package com.vulkanreplaycompat.mixin;
+
+import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.render.BufferBuilder;
+import net.minecraft.client.render.BuiltBuffer;
+import net.minecraft.client.render.Tessellator;
+import net.minecraft.client.render.VertexFormat;
+import net.minecraft.client.render.VertexFormats;
+import imgui.moulberry90.ImDrawData;
+import net.vulkanmod.vulkan.Renderer;
+import org.lwjgl.glfw.GLFW;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Overwrite;
+import org.spongepowered.asm.mixin.Pseudo;
+
+import java.nio.ByteBuffer;
+
+@Pseudo
+@Mixin(targets = "com.replaymod.moulberry90.customimgui.CustomImGuiImplGl3")
+public class MixinCustomImGuiImplGl3 {
+
+    /**
+     * @author Antigravity
+     * @reason Replace OpenGL ImGui rendering with VulkanMod rendering for Minecraft 1.21.11
+     */
+    @Overwrite
+    public void renderDrawData(ImDrawData drawData) {
+        if (drawData.getCmdListsCount() <= 0) {
+            return;
+        }
+
+        int fbWidth = (int) (drawData.getDisplaySizeX() * drawData.getFramebufferScaleX());
+        int fbHeight = (int) (drawData.getDisplaySizeY() * drawData.getFramebufferScaleY());
+        if (fbWidth <= 0 || fbHeight <= 0) {
+            return;
+        }
+
+        float clipOffX = drawData.getDisplayPosX();
+        float clipOffY = drawData.getDisplayPosY();
+        float clipScaleX = drawData.getFramebufferScaleX();
+        float clipScaleY = drawData.getFramebufferScaleY();
+
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.disableCull();
+        RenderSystem.enableDepthTest();
+        RenderSystem.enableScissor(0, 0, fbWidth, fbHeight);
+
+        Tessellator tessellator = Tessellator.getInstance();
+
+        for (int n = 0; n < drawData.getCmdListsCount(); n++) {
+            ByteBuffer vtxBuffer = drawData.getCmdListVtxBufferData(n);
+            ByteBuffer idxBuffer = drawData.getCmdListIdxBufferData(n);
+
+            int vtxStride = 20; // ImDrawVert size (2 floats pos, 2 floats uv, 4 bytes col)
+            boolean isIdx16 = drawData.getCmdListIdxBufferSize(n) == 2;
+
+            for (int cmdIdx = 0; cmdIdx < drawData.getCmdListCmdBufferSize(n); cmdIdx++) {
+                if (drawData.getCmdListCmdBufferUserCallback(n, cmdIdx) != null) {
+                    continue;
+                }
+
+                float clipRectX = (drawData.getCmdListCmdBufferClipRectX(n, cmdIdx) - clipOffX) * clipScaleX;
+                float clipRectY = (drawData.getCmdListCmdBufferClipRectY(n, cmdIdx) - clipOffY) * clipScaleY;
+                float clipRectZ = (drawData.getCmdListCmdBufferClipRectZ(n, cmdIdx) - clipOffX) * clipScaleX;
+                float clipRectW = (drawData.getCmdListCmdBufferClipRectW(n, cmdIdx) - clipOffY) * clipScaleY;
+
+                if (clipRectX < fbWidth && clipRectY < fbHeight && clipRectZ >= 0.0f && clipRectW >= 0.0f) {
+                    RenderSystem.scissor(
+                            (int) clipRectX,
+                            (int) (fbHeight - clipRectW),
+                            (int) (clipRectZ - clipRectX),
+                            (int) (clipRectW - clipRectY)
+                    );
+
+                    int elemCount = drawData.getCmdListCmdBufferElemCount(n, cmdIdx);
+                    int idxOffset = drawData.getCmdListCmdBufferIdxOffset(n, cmdIdx);
+                    int vtxOffset = drawData.getCmdListCmdBufferVtxOffset(n, cmdIdx);
+
+                    BufferBuilder bufferBuilder = tessellator.begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR_TEXTURE);
+
+                    for (int i = 0; i < elemCount; i++) {
+                        int index = isIdx16 ? idxBuffer.getShort((idxOffset + i) * 2) & 0xFFFF : idxBuffer.getInt((idxOffset + i) * 4);
+                        int vertexBase = (vtxOffset + index) * vtxStride;
+
+                        float x = vtxBuffer.getFloat(vertexBase);
+                        float y = vtxBuffer.getFloat(vertexBase + 4);
+                        float u = vtxBuffer.getFloat(vertexBase + 8);
+                        float v = vtxBuffer.getFloat(vertexBase + 12);
+                        int color = vtxBuffer.getInt(vertexBase + 16);
+
+                        int r = color & 0xFF;
+                        int g = (color >> 8) & 0xFF;
+                        int b = (color >> 16) & 0xFF;
+                        int a = (color >> 24) & 0xFF;
+                        int argb = (a << 24) | (r << 16) | (g << 8) | b;
+
+                        bufferBuilder.vertex(x, y, 0).color(argb).texture(u, v);
+                    }
+
+                    BuiltBuffer builtBuffer = bufferBuilder.endNullable();
+                    if (builtBuffer != null) {
+                        try {
+                            ByteBuffer vertexData = builtBuffer.getBuffer();
+                            Renderer.getDrawer().draw(vertexData, VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR_TEXTURE, elemCount);
+                            builtBuffer.close();
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }
+        }
+        RenderSystem.disableScissor();
+    }
+}
