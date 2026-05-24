@@ -309,10 +309,6 @@ public class MixinCustomImGuiImplGl3 {
                         float v = vtxBuffer.getFloat(base + 12);
                         int color = vtxBuffer.getInt(base + 16);
 
-                        if (n == 0 && i == 0) {
-                            System.out.println("[VulkanReplayCompat] Vertex 0: X=" + x + " Y=" + y + " U=" + u + " V=" + v + " Color=" + Integer.toHexString(color));
-                        }
-
                         int r = color & 0xFF;
                         int g = (color >> 8) & 0xFF;
                         int b = (color >> 16) & 0xFF;
