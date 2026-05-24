@@ -388,6 +388,11 @@ public class MixinCustomImGuiImplGl3 {
                                         .invoke(commandEncoder, nameSupplier, colorAttachmentView, java.util.OptionalInt.empty(), depthAttachmentView, java.util.OptionalDouble.empty());
 
                                     try {
+                                        Class<?> vrsClassM = Class.forName("net.vulkanmod.vulkan.VRenderSystem");
+                                        vrsClassM.getMethod("applyModelViewMatrix", org.joml.Matrix4f.class).invoke(null, com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrix());
+                                        vrsClassM.getMethod("applyProjectionMatrix", org.joml.Matrix4f.class).invoke(null, com.mojang.blaze3d.systems.RenderSystem.getProjectionMatrix());
+                                        vrsClassM.getMethod("calculateMVP").invoke(null);
+                                        
                                         java.lang.reflect.Method getBuffersM = vkPipeline.getClass().getMethod("getBuffers");
                                         java.util.List<?> uboList = (java.util.List<?>) getBuffersM.invoke(vkPipeline);
                                         if (uboList != null) {
