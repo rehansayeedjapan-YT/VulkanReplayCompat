@@ -272,20 +272,24 @@ public class MixinCustomImGuiImplGl3 {
                                 try {
                                     java.lang.reflect.Method getBuffersM = vkPipeline.getClass().getMethod("getBuffers");
                                     java.util.List<?> uboList = (java.util.List<?>) getBuffersM.invoke(vkPipeline);
-                                    if (System.currentTimeMillis() % 1000 < 50) {
-                                        System.out.println("[VulkanReplayCompat] Forcing UBO updates! Count: " + uboList.size());
-                                    }
-                                    for (Object ubo : uboList) {
-                                        java.lang.reflect.Method setUpdateM = ubo.getClass().getMethod("setUpdate", boolean.class);
-                                        setUpdateM.invoke(ubo, true);
+                                    if (uboList != null) {
+                                        if (System.currentTimeMillis() % 1000 < 50) {
+                                            System.out.println("[VulkanReplayCompat] Forcing UBO updates! Count: " + uboList.size());
+                                        }
+                                        for (Object ubo : uboList) {
+                                            java.lang.reflect.Method setUpdateM = ubo.getClass().getMethod("setUpdate", boolean.class);
+                                            setUpdateM.invoke(ubo, true);
+                                        }
                                     }
                                 } catch (Exception ignored) {}
                                 uploadUBOs.invoke(rendererInst, vkPipeline);
-                                if (pushConstants != null) {
-                                    pushConstants.invoke(rendererInst, vkPipeline);
-                                }
                             } catch (Exception e) {
-                                System.err.println("[VulkanReplayCompat] Pipeline bind failed: " + e);
+                                System.err.println("[VulkanReplayCompat] Pipeline bind failed:");
+                                e.printStackTrace();
+                                if (e instanceof java.lang.reflect.InvocationTargetException) {
+                                    System.err.println("Cause:");
+                                    ((java.lang.reflect.InvocationTargetException)e).getCause().printStackTrace();
+                                }
                             }
                         }
 
