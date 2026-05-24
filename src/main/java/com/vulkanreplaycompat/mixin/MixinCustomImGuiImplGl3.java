@@ -89,7 +89,7 @@ public class MixinCustomImGuiImplGl3 {
             vrsEnableBlend     = cls.getMethod("enableBlend");
             vrsDisableBlend    = cls.getMethod("disableBlend");
             vrsBlendFunc       = cls.getMethod("blendFunc", int.class, int.class);
-            vrsAvailable = false; // FORCE VANILLA PATH
+            vrsAvailable = true;
         } catch (Exception e) {
             System.err.println("[VulkanReplayCompat] VRenderSystem not found: " + e.getMessage());
         }
@@ -162,7 +162,27 @@ public class MixinCustomImGuiImplGl3 {
             Object mcPipeline = net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED;
             Class<?> extClass = Class.forName("net.vulkanmod.interfaces.shader.ExtendedRenderPipeline");
             if (extClass.isInstance(mcPipeline)) {
-                vkPipeline   = extClass.getMethod("getPipeline").invoke(mcPipeline);
+                // Try to get pipeline
+                vkPipeline = extClass.getMethod("getPipeline").invoke(mcPipeline);
+                
+                // If null, it hasn't been compiled yet. Force compile it!
+                if (vkPipeline == null) {
+                    try {
+                        Class<?> rendererClass = Class.forName("net.vulkanmod.vulkan.Renderer");
+                        Object rInst = rendererClass.getMethod("getInstance").invoke(null);
+                        Object device = rendererClass.getMethod("getDevice").invoke(rInst);
+                        Class<?> deviceClass = Class.forName("net.vulkanmod.render.engine.VkGpuDevice");
+                        Class<?> rpClass = Class.forName("com.mojang.blaze3d.pipeline.RenderPipeline");
+                        deviceClass.getMethod("compilePipeline", rpClass).invoke(device, mcPipeline);
+                        
+                        // Try again
+                        vkPipeline = extClass.getMethod("getPipeline").invoke(mcPipeline);
+                        System.out.println("[VulkanReplayCompat] Forced compilation of GUI_TEXTURED pipeline! Success=" + (vkPipeline != null));
+                    } catch (Exception e) {
+                        System.err.println("[VulkanReplayCompat] Failed to compile GUI_TEXTURED: " + e.getMessage());
+                    }
+                }
+                
                 rendererInst = Renderer.getInstance();
                 Class<?> graphPipeClass = Class.forName("net.vulkanmod.vulkan.shader.GraphicsPipeline");
                 Class<?> basePipeClass  = Class.forName("net.vulkanmod.vulkan.shader.Pipeline");
@@ -335,8 +355,13 @@ public class MixinCustomImGuiImplGl3 {
                                             setUpdateM.invoke(ubo, true);
                                         }
                                     }
-                                } catch (Exception ignored) {}
-                                uploadUBOs.invoke(rendererInst, vkPipeline);
+                                    RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
+                                    RenderSystem.disableDepthTest();
+                                    RenderSystem.disableCull();
+                                    RenderSystem.enableBlend();
+                                    RenderSystem.defaultBlendFunc();
+                                    uploadUBOs.invoke(rendererInst, vkPipeline);
+                                } catch (Exception e) {}
                             } catch (Exception e) {}
                         }
 
