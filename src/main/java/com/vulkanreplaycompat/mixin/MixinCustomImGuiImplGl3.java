@@ -46,11 +46,10 @@ public class MixinCustomImGuiImplGl3 {
         float clipOffY = drawData.getDisplayPosY();
         float scale = (float) MinecraftClient.getInstance().getWindow().getScaleFactor();
 
-        context.getMatrices().pushMatrix();
-        context.getMatrices().identity();
-        context.getMatrices().scale(1.0f / scale, 1.0f / scale);
+        context.getMatrices().push();
+        context.getMatrices().scale(1.0f / scale, 1.0f / scale, 1.0f);
         
-        org.joml.Matrix3x2f m = context.getMatrices();
+        org.joml.Matrix4f m = context.getMatrices().peek().getPositionMatrix();
 
         ImVec4 clipRect = new ImVec4();
         
@@ -113,8 +112,8 @@ public class MixinCustomImGuiImplGl3 {
                     int   b = vtxBuffer.get(base + 18) & 0xFF;
                     int   a = vtxBuffer.get(base + 19) & 0xFF;
 
-                    float x1 = x * m.m00() + y * m.m10() + m.m20();
-                    float y1 = x * m.m01() + y * m.m11() + m.m21();
+                    float x1 = x * m.m00() + y * m.m10() + m.m30();
+                    float y1 = x * m.m01() + y * m.m11() + m.m31();
 
                     bufferBuilder.vertex(x1, y1, 500.0f).texture(u, v).color(r, g, b, a);
                 }
@@ -126,7 +125,7 @@ public class MixinCustomImGuiImplGl3 {
             }
         }
 
-        context.getMatrices().popMatrix();
+        context.getMatrices().pop();
     }
 
     @Inject(method = "destroyDeviceObjects", at = @At("HEAD"), cancellable = true, remap = false)
@@ -167,11 +166,11 @@ public class MixinCustomImGuiImplGl3 {
             net.minecraft.client.texture.NativeImage img = new net.minecraft.client.texture.NativeImage(net.minecraft.client.texture.NativeImage.Format.RGBA, w, h, false);
             org.lwjgl.system.MemoryUtil.memCopy(
                 org.lwjgl.system.MemoryUtil.memAddress(texData),
-                img.imageId(),
+                img.getAddress(),
                 (long) texData.limit()
             );
 
-            net.minecraft.client.texture.NativeImageBackedTexture tex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "flashback_font", img);
+            net.minecraft.client.texture.NativeImageBackedTexture tex = new net.minecraft.client.texture.NativeImageBackedTexture(img);
             Identifier id = Identifier.of("flashback", "font");
             MinecraftClient.getInstance().getTextureManager().registerTexture(id, tex);
 
