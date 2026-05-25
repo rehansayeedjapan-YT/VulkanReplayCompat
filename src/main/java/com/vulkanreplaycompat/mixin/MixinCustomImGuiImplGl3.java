@@ -44,17 +44,20 @@ public class MixinCustomImGuiImplGl3 {
 
         float clipOffX = drawData.getDisplayPosX();
         float clipOffY = drawData.getDisplayPosY();
-
-        // ImGui operates in raw pixels. Minecraft's HUD scales coordinates.
-        // We push a transformation matrix to invert the GUI scale factor so raw pixel inputs map accurately.
         float scale = (float) MinecraftClient.getInstance().getWindow().getScaleFactor();
 
         context.getMatrices().pushMatrix();
         context.getMatrices().identity();
         context.getMatrices().scale(1.0f / scale, 1.0f / scale);
-        Matrix4f matrix = new Matrix4f().set(context.getMatrices());
+        
+        org.joml.Matrix3x2f m = context.getMatrices();
 
         ImVec4 clipRect = new ImVec4();
+        
+        RenderSystem.setShader(net.minecraft.client.render.GameRenderer::getPositionTexColorProgram);
+        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
 
         for (int n = 0; n < drawData.getCmdListsCount(); n++) {
             ByteBuffer rawVtx = drawData.getCmdListVtxBufferData(n);
@@ -65,7 +68,7 @@ public class MixinCustomImGuiImplGl3 {
             
             ByteBuffer idxBuffer = drawData.getCmdListIdxBufferData(n).order(ByteOrder.nativeOrder());
 
-            final int vtxStride = 20; // ImDrawVert: xy(8) + uv(8) + col(4)
+            final int vtxStride = 20; 
             boolean isIdx16 = (imgui.moulberry90.ImDrawData.sizeOfImDrawIdx() == 2);
 
             for (int cmdIdx = 0; cmdIdx < drawData.getCmdListCmdBufferSize(n); cmdIdx++) {
@@ -82,29 +85,16 @@ public class MixinCustomImGuiImplGl3 {
                 int idxOffset = drawData.getCmdListCmdBufferIdxOffset(n, cmdIdx);
                 int vtxOffset = drawData.getCmdListCmdBufferVtxOffset(n, cmdIdx);
 
-                // Resolve the texture identifier securely
                 Identifier texIdentifier = Identifier.of("flashback", "font");
                 Object textureIdObj = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
-                if (textureIdObj instanceof Integer && (Integer) textureIdObj == 999999) {
-                    texIdentifier = Identifier.of("flashback", "font");
-                } else if (textureIdObj instanceof Identifier) {
+                if (textureIdObj instanceof Identifier) {
                     texIdentifier = (Identifier) textureIdObj;
                 }
 
-                // Enable native scissoring mapped to Minecraft's GUI scaled expectations
-                // Temporarily commented out for blackout sanity check!
-                /*
-                context.enableScissor(
-                    (int) (clipMinX / scale),
-                    (int) (clipMinY / scale),
-                    (int) (clipMaxX / scale),
-                    (int) (clipMaxY / scale)
-                );
-                */
+                RenderSystem.setShaderTexture(0, texIdentifier);
 
-                // Fetch a native VertexConsumer mapped to GUI_TEXTURED rendering layouts
-                net.minecraft.client.render.VertexConsumerProvider.Immediate consumers = MinecraftClient.getInstance().getBufferBuilders().getEntityVertexConsumers();
-                VertexConsumer consumer = consumers.getBuffer(RenderLayer.getGuiTextured(texIdentifier));
+                net.minecraft.client.render.Tessellator tessellator = net.minecraft.client.render.Tessellator.getInstance();
+                net.minecraft.client.render.BufferBuilder bufferBuilder = tessellator.begin(net.minecraft.client.render.VertexFormat.DrawMode.TRIANGLES, net.minecraft.client.render.VertexFormats.POSITION_TEXTURE_COLOR);
 
                 for (int i = 0; i < elemCount; i++) {
                     int idxByteOffset = (idxOffset + i) * (isIdx16 ? 2 : 4);
@@ -123,13 +113,16 @@ public class MixinCustomImGuiImplGl3 {
                     int   b = vtxBuffer.get(base + 18) & 0xFF;
                     int   a = vtxBuffer.get(base + 19) & 0xFF;
 
-                    // Stream directly into the consumer
-                    consumer.vertex(matrix, x, y, 500.0f).texture(u, v).color(r, g, b, a);
+                    float x1 = x * m.m00() + y * m.m10() + m.m20();
+                    float y1 = x * m.m01() + y * m.m11() + m.m21();
+
+                    bufferBuilder.vertex(x1, y1, 500.0f).texture(u, v).color(r, g, b, a);
                 }
 
-                // Flush this specific scissor batch immediately before moving to next command lists
-                consumers.draw();
-                // context.disableScissor(); // Disabled for now along with enableScissor
+                net.minecraft.client.render.BuiltBuffer builtBuffer = bufferBuilder.endNullable();
+                if (builtBuffer != null) {
+                    net.minecraft.client.render.BufferRenderer.drawWithGlobalProgram(builtBuffer);
+                }
             }
         }
 
