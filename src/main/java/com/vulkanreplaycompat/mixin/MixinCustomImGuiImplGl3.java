@@ -164,11 +164,16 @@ public class MixinCustomImGuiImplGl3 {
             int h = heightOut.get();
 
             net.minecraft.client.texture.NativeImage img = new net.minecraft.client.texture.NativeImage(net.minecraft.client.texture.NativeImage.Format.RGBA, w, h, false);
-            org.lwjgl.system.MemoryUtil.memCopy(
-                org.lwjgl.system.MemoryUtil.memAddress(texData),
-                img.getAddress(),
-                (long) texData.limit()
-            );
+            texData.rewind();
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    int r = texData.get() & 0xFF;
+                    int g = texData.get() & 0xFF;
+                    int b = texData.get() & 0xFF;
+                    int a = texData.get() & 0xFF;
+                    img.setColor(x, y, (a << 24) | (b << 16) | (g << 8) | r);
+                }
+            }
 
             net.minecraft.client.texture.NativeImageBackedTexture tex = new net.minecraft.client.texture.NativeImageBackedTexture(img);
             Identifier id = Identifier.of("flashback", "font");
